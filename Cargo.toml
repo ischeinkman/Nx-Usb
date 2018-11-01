@@ -1,0 +1,14 @@
+[package]
+name = "nxusb"
+version = "0.0.5"
+authors = ["scheinkman.ilan@gmail.com"]
+
+[[bin]]
+name = "nxusb"
+path = "src/main.rs"
+
+[dependencies.libnx-rs]
+git = "https://github.com/ischeinkman/libnx-rs"
+
+[dependencies.libc]
+version = "0.2"

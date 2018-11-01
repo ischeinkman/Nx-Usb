@@ -1,0 +1,24 @@
+[dependencies.core]
+stage = 0
+
+[dependencies.alloc]
+stage = 1
+
+[dependencies.rand]
+stage = 2
+git = "https://github.com/rust-lang-nursery/rand"
+default-features = false
+
+[dependencies.libc]
+stage = 3
+default-features=false 
+features = ["align"] 
+
+[dependencies.std]
+git = "https://github.com/ischeinkman/libnx-rs-std"
+ranch = "switch" 
+features = [
+    "panic-unwind", 
+    "backtrace",
+]
+stage = 4
