@@ -16,7 +16,7 @@ features = ["align"]
 
 [dependencies.std]
 git = "https://github.com/ischeinkman/libnx-rs-std"
-ranch = "switch" 
+branch = "switch" 
 features = [
     "panic-unwind", 
     "backtrace",
