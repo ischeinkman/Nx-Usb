@@ -1,3 +1,4 @@
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct ReadPrefix {
     pub flags: u16,
     pub file_name_length: u16,
@@ -30,6 +31,7 @@ impl CommandPrefix for ReadPrefix {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct WritePrefix {
     pub flags: u16,
     pub file_name_length: u16,
@@ -59,6 +61,7 @@ impl CommandPrefix for WritePrefix {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Prefixes {
     Write(WritePrefix),
     Read(ReadPrefix),
