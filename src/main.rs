@@ -1,5 +1,3 @@
-extern crate libnx_rs;
-use libnx_rs::{console, usbcomms};
 
 extern crate libc;
 
@@ -12,6 +10,11 @@ use std::os::unix::io::AsRawFd;
 use std::panic;
 use std::result::Result;
 
+#[cfg(feature="libnx")]
+extern crate libnx_rs;
+#[cfg(feature="libnx")]
+use libnx_rs::{console, usbcomms};
+#[cfg(feature="libnx")]
 pub fn main() {
     let mut stderr = match redirect_stderr("nxusb.stderr.txt") {
         Ok(f) => f,
@@ -29,6 +32,7 @@ pub fn main() {
     let _f = stderr.flush();
 }
 
+#[cfg(feature="libnx")]
 pub fn runner() -> Result<(), String> {
     eprintln!("Initing console.");
     let mut debug = console::ConsoleHandle::default();

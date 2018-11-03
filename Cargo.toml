@@ -9,6 +9,10 @@ path = "src/main.rs"
 
 [dependencies.libnx-rs]
 git = "https://github.com/ischeinkman/libnx-rs"
+optional=true
 
 [dependencies.libc]
 version = "0.2"
+
+[features]
+libnx = ["libnx-rs"]

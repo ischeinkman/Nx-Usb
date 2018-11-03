@@ -1,6 +1,3 @@
-[build]
-target = "aarch64-none-elf"
-
 [target.aarch64-none-elf]
 linker = "aarch64-none-elf-gcc"
 rustflags = [
