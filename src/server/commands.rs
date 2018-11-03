@@ -1,8 +1,6 @@
 use super::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
 
-use std::marker::PhantomData;
-
-pub trait CommandRunner<T: CommandPrefix> {
+pub trait DeviceCommand<T: CommandPrefix> {
     /// Initialized a new, unstarted command environment from a command prefix.
     fn from_prefix(prefix: T) -> Self;
 
@@ -28,12 +26,12 @@ pub trait CommandRunner<T: CommandPrefix> {
 ///
 /// The parameter `FileReaderType` is the type to be used to find the files and
 /// read their content.
+#[derive(Debug)]
 pub struct ReadCommand<FileReaderType: FileReader> {
     prefix: ReadPrefix,
     file_name: String,
     file: Option<FileReaderType>,
     finished: bool,
-    _phantoms: PhantomData<FileReaderType>,
 }
 
 /// A trait to abstract over a cursor-based approach for reading an object from a
@@ -48,7 +46,7 @@ pub trait FileReader: Sized {
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String>;
 }
 
-impl<FileReaderType: FileReader> CommandRunner<ReadPrefix> for ReadCommand<FileReaderType> {
+impl<FileReaderType: FileReader> DeviceCommand<ReadPrefix> for ReadCommand<FileReaderType> {
     fn from_prefix(prefix: ReadPrefix) -> Self {
         let ln = prefix.file_name_length as usize;
         ReadCommand {
@@ -56,7 +54,6 @@ impl<FileReaderType: FileReader> CommandRunner<ReadPrefix> for ReadCommand<FileR
             file_name: String::with_capacity(ln),
             file: None,
             finished: false,
-            _phantoms: PhantomData,
         }
     }
 
@@ -114,16 +111,16 @@ pub trait FileWriter: Sized {
     fn write_bytes(&mut self, buffer: &[u8]) -> Result<usize, String>;
 }
 
+#[derive(Debug)]
 pub struct WriteCommand<FileWriterType: FileWriter> {
     prefix: WritePrefix,
     file_name: String,
     file: Option<FileWriterType>,
     finished: bool,
     write_idx: usize,
-    _phantoms: PhantomData<FileWriterType>,
 }
 
-impl<WriterType: FileWriter> CommandRunner<WritePrefix> for WriteCommand<WriterType> {
+impl<WriterType: FileWriter> DeviceCommand<WritePrefix> for WriteCommand<WriterType> {
     fn from_prefix(prefix: WritePrefix) -> Self {
         let ln = prefix.file_name_length as usize;
         WriteCommand {
@@ -132,7 +129,6 @@ impl<WriterType: FileWriter> CommandRunner<WritePrefix> for WriteCommand<WriterT
             file: None,
             finished: false,
             write_idx: 0,
-            _phantoms: PhantomData,
         }
     }
     fn needs_input(&self) -> bool {
@@ -143,7 +139,6 @@ impl<WriterType: FileWriter> CommandRunner<WritePrefix> for WriteCommand<WriterT
         let block_size = block.len();
         let name_bytes_to_get = self.prefix.file_name_length as usize - self.file_name.len();
         let file_bytes_to_get = self.prefix.file_length as usize - self.write_idx;
-
         //Already finished: do nothing.
         if self.finished || block_size == 0 {
             Ok(0)
@@ -192,6 +187,9 @@ impl<WriterType: FileWriter> CommandRunner<WritePrefix> for WriteCommand<WriterT
             let not_name = &block[name_bytes_to_get..];
             let file_bytes = &not_name[0..file_bytes_to_get.min(block_size - name_bytes_to_get)];
             let rval = fl.write_bytes(file_bytes);
+            if let Ok(n) = rval {
+                self.write_idx = n;
+            }
             self.file = Some(fl);
             rval
         }
