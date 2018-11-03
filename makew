@@ -5,8 +5,7 @@ echo "Starting new build."\
  &&\
  CARGO_INCREMENTAL=0\
  RUST_TARGET_PATH="$PWD"\
- RUST_BACKTRACE=1\
- xargo build --bin nxusb --target=aarch64-none-elf --verbose\
+ xargo build --bin nxusb --target=aarch64-none-elf --release --features="libnx" --verbose\
  &&\
  echo "Compiled rust target. Now creating nro."\
  &&\
