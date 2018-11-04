@@ -1,6 +1,6 @@
 use super::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
 
-pub trait DeviceCommand<T: CommandPrefix> {
+pub trait ServerCommandState<T: CommandPrefix> {
     /// Initialized a new, unstarted command environment from a command prefix.
     fn from_prefix(prefix: T) -> Self;
 
@@ -27,7 +27,7 @@ pub trait DeviceCommand<T: CommandPrefix> {
 /// The parameter `FileReaderType` is the type to be used to find the files and
 /// read their content.
 #[derive(Debug)]
-pub struct ReadCommand<FileReaderType: FileReader> {
+pub struct ReadCommandState<FileReaderType: FileReader> {
     prefix: ReadPrefix,
     file_name: String,
     file: Option<FileReaderType>,
@@ -40,16 +40,19 @@ pub trait FileReader: Sized {
     /// Creates a handle to the object to be read
     fn new(file_name: &str) -> Result<Self, String>;
 
+    /// Gets the number of bytes in this File. 
+    fn len(&self) -> usize;
+
     /// Reads the next bytes to the given buffer, returning the number of bytes read.
     /// This function either fills up the buffer if it can or short-circuits if it reaches
     /// the end of the file's content before the buffer is filled.
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String>;
 }
 
-impl<FileReaderType: FileReader> DeviceCommand<ReadPrefix> for ReadCommand<FileReaderType> {
+impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix> for ReadCommandState<FileReaderType> {
     fn from_prefix(prefix: ReadPrefix) -> Self {
         let ln = prefix.file_name_length as usize;
-        ReadCommand {
+        ReadCommandState {
             prefix,
             file_name: String::with_capacity(ln),
             file: None,
@@ -76,8 +79,6 @@ impl<FileReaderType: FileReader> DeviceCommand<ReadPrefix> for ReadCommand<FileR
             let part =
                 String::from_utf8(bytes).map_err(|e| format!("UTF8 Error: {:?}", e).to_owned())?;
             self.file_name.push_str(&part);
-            let fl = FileReaderType::new(&self.file_name)?;
-            self.file = Some(fl);
             Ok(need_bytes)
         }
     }
@@ -87,13 +88,24 @@ impl<FileReaderType: FileReader> DeviceCommand<ReadPrefix> for ReadCommand<FileR
     }
 
     fn output_block(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        let buflen = buffer.len();
+        let buffer_idx_begin = if self.file.is_none() {
+            let fl = FileReaderType::new(&self.file_name)?;
+            let fl_len = fl.len();
+            buffer[0] = ((fl_len & 0xFF000000) >> 24) as u8; 
+            buffer[1] = ((fl_len & 0xFF0000) >> 16) as u8; 
+            buffer[2] = ((fl_len & 0xFF00) >> 8) as u8; 
+            buffer[3] = (fl_len & 0xFF) as u8; 
+            self.file = Some(fl);
+            4
+        } 
+        else { 0 };
         let fl = if let Some(f) = &mut self.file {
             f
         } else {
             return Ok(0);
         };
-        let buflen = buffer.len();
-        let read_bytes = fl.read_bytes(buffer)?;
+        let read_bytes = fl.read_bytes(&mut buffer[buffer_idx_begin ..])?;
         if read_bytes < buflen {
             self.finished = true;
         }
@@ -112,7 +124,7 @@ pub trait FileWriter: Sized {
 }
 
 #[derive(Debug)]
-pub struct WriteCommand<FileWriterType: FileWriter> {
+pub struct WriteCommandState<FileWriterType: FileWriter> {
     prefix: WritePrefix,
     file_name: String,
     file: Option<FileWriterType>,
@@ -120,10 +132,10 @@ pub struct WriteCommand<FileWriterType: FileWriter> {
     write_idx: usize,
 }
 
-impl<WriterType: FileWriter> DeviceCommand<WritePrefix> for WriteCommand<WriterType> {
+impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandState<WriterType> {
     fn from_prefix(prefix: WritePrefix) -> Self {
         let ln = prefix.file_name_length as usize;
-        WriteCommand {
+        WriteCommandState {
             prefix,
             file_name: String::with_capacity(ln),
             file: None,

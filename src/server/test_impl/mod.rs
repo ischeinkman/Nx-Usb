@@ -1,6 +1,6 @@
-use server::commands::{FileReader, FileWriter, ReadCommand, WriteCommand, DeviceCommand};
+use server::commands::{FileReader, FileWriter, ReadCommandState, WriteCommandState, ServerCommandState};
 use server::prefixes::{PREFIX_LENGTH, Prefixes, CommandPrefix, ReadPrefix, WritePrefix};
-use server::interface::Device;
+use server::interface::ServerDevice;
 use std::collections::HashMap;
 use std::vec::Vec;
 use std::sync::{Once, ONCE_INIT};
@@ -37,6 +37,9 @@ impl FileReader for TestFileReader {
         Ok(TestFileReader {
             bytes : bts
         })
+    }
+    fn len(&self) -> usize {
+        self.bytes.len()
     }
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         let buflen = buffer.len();
@@ -105,7 +108,7 @@ impl TestUsbDevice {
 }
 
 
-impl Device for TestUsbDevice {
+impl ServerDevice for TestUsbDevice {
     fn block_size(&self) -> usize {
         TEST_BLOCK_SIZE
     }
@@ -216,7 +219,7 @@ fn test_read_file() {
         flags : 0,
         file_name_length : 3
     };
-    let mut read_command = ReadCommand::<TestFileReader>::from_prefix(read_prefix);
+    let mut read_command = ReadCommandState::<TestFileReader>::from_prefix(read_prefix);
 
     while read_command.needs_input() || read_command.needs_output() {
         if read_command.needs_input() {
@@ -229,6 +232,7 @@ fn test_read_file() {
         }
     }
     assert!(usb_ctx.input_buf.clone().into_iter().all(|a| a == 0));
+    assert_eq!(usb_ctx.pull_output(4), vec![0, 0, 0, 5]);
     assert_eq!(usb_ctx.pull_output(5), file);
 }
 
@@ -252,7 +256,7 @@ fn test_write_file() {
         file_name_length : 3,
         file_length : 5
     };
-    let mut write_command = WriteCommand::<TestFileWriter>::from_prefix(write_prefix);
+    let mut write_command = WriteCommandState::<TestFileWriter>::from_prefix(write_prefix);
 
     while write_command.needs_input() || write_command.needs_output() {
         if write_command.needs_input() {

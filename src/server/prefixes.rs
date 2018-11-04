@@ -11,7 +11,8 @@ where
     Self: Sized,
 {
     fn parse_prefix(prefix: [u8; PREFIX_LENGTH]) -> Option<Self>;
-    fn arg_bytes_to_read(&self) -> usize;
+    
+    fn serialize(&self) -> [u8 ; PREFIX_LENGTH];
 }
 
 impl CommandPrefix for ReadPrefix {
@@ -26,8 +27,13 @@ impl CommandPrefix for ReadPrefix {
             file_name_length,
         })
     }
-    fn arg_bytes_to_read(&self) -> usize {
-        self.file_name_length as usize
+
+    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
+        [
+            (self.flags & 0xFF00 >> 8) as u8, (self.flags & 0x00FF) as u8, 
+            (self.file_name_length & 0xFF00 >> 8) as u8, (self.file_name_length & 0x00FF) as u8, 
+            0,0,0,0
+        ]
     }
 }
 
@@ -56,8 +62,13 @@ impl CommandPrefix for WritePrefix {
         })
     }
 
-    fn arg_bytes_to_read(&self) -> usize {
-        self.file_name_length as usize + self.file_length as usize
+    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
+        [
+            (self.flags & 0xFF00 >> 8) as u8, (self.flags & 0x00FF) as u8, 
+            (self.file_name_length & 0xFF00 >> 8) as u8, (self.file_name_length & 0x00FF) as u8, 
+            (self.file_length & 0xFF000000 >> 24) as u8, (self.file_length & 0x00FF0000 >> 16) as u8, 
+            (self.file_length & 0xFF00 >> 8) as u8, (self.file_length & 0x00FF) as u8, 
+        ]
     }
 }
 
@@ -74,10 +85,10 @@ impl CommandPrefix for Prefixes {
             .or(ReadPrefix::parse_prefix(prefix).map(|r| Prefixes::Read(r)))
     }
 
-    fn arg_bytes_to_read(&self) -> usize {
+    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
         match self {
-            Prefixes::Read(ref inner) => inner.arg_bytes_to_read(),
-            Prefixes::Write(ref inner) => inner.arg_bytes_to_read(),
+            Prefixes::Write(w) => w.serialize(), 
+            Prefixes::Read(r) => r.serialize()
         }
     }
 }

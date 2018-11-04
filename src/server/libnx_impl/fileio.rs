@@ -56,6 +56,11 @@ impl FileReader for StdFileReader {
             finished: !pt.exists(),
         })
     }
+
+    fn len(&self) -> usize {
+        self.file.as_ref().and_then(|f| f.metadata().ok()).map_or(0, |m| m.len() as usize)
+    }
+
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         let buflen = buffer.len();
         if self.finished {
