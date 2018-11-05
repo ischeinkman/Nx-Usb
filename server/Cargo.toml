@@ -1,0 +1,21 @@
+[package]
+name = "server"
+version = "0.0.5"
+authors = ["scheinkman.ilan@gmail.com"]
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies.libnx-rs]
+git = "https://github.com/ischeinkman/libnx-rs"
+optional=true
+
+[dependencies.libc]
+version = "0.2"
+
+[dependencies.nxusb]
+path = ".."
+
+[features]
+libnx = ["libnx-rs"]

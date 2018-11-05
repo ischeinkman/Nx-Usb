@@ -1,7 +1,16 @@
 
 extern crate libc;
 
-mod server;
+pub mod commands;
+
+pub mod interface;
+
+extern crate nxusb;
+pub use nxusb::prefixes;
+
+pub mod libnx_impl;
+
+pub mod test_impl;
 
 use std::fs::File;
 use std::fs::OpenOptions;

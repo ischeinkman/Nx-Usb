@@ -1,6 +1,6 @@
-use server::commands::{FileReader, FileWriter, ReadCommandState, WriteCommandState, ServerCommandState};
-use server::prefixes::{PREFIX_LENGTH, Prefixes, CommandPrefix, ReadPrefix, WritePrefix};
-use server::interface::ServerDevice;
+use commands::{FileReader, FileWriter, ReadCommandState, WriteCommandState, ServerCommandState};
+use prefixes::{PREFIX_LENGTH, Prefixes, CommandPrefix, ReadPrefix, WritePrefix};
+use interface::ServerDevice;
 use std::collections::HashMap;
 use std::vec::Vec;
 use std::sync::{Once, ONCE_INIT};

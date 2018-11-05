@@ -1,4 +1,4 @@
-use server::prefixes::Prefixes;
+use prefixes::Prefixes;
 
 pub trait ServerDevice {
     fn read_prefix(&mut self) -> Result<Prefixes, String>;
