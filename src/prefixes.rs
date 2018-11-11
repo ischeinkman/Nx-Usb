@@ -1,3 +1,20 @@
+#[inline]
+fn extract_bytes_u16(inp: u16) -> (u8, u8) {
+    let first = ((inp & 0xFF00) >> 8) as u8;
+    let second = (inp & 0x00FF) as u8;
+    (first, second)
+}
+
+#[inline]
+fn extract_bytes_u32(inp: u32) -> (u8, u8, u8, u8) {
+    let last = (inp & 0xFF) as u8;
+    let third = ((inp & 0xFF00) >> 8) as u8;
+    let second = ((inp & 0xFF0000) >> 16) as u8;
+    let head = ((inp & 0xFF000000) >> 24) as u8;
+
+    (head, second, third, last)
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct ReadPrefix {
     pub flags: u16,
@@ -11,8 +28,8 @@ where
     Self: Sized,
 {
     fn parse_prefix(prefix: [u8; PREFIX_LENGTH]) -> Option<Self>;
-    
-    fn serialize(&self) -> [u8 ; PREFIX_LENGTH];
+
+    fn serialize(&self) -> [u8; PREFIX_LENGTH];
 }
 
 impl CommandPrefix for ReadPrefix {
@@ -28,11 +45,18 @@ impl CommandPrefix for ReadPrefix {
         })
     }
 
-    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
+    fn serialize(&self) -> [u8; PREFIX_LENGTH] {
+        let flag_bytes = extract_bytes_u16(self.flags);
+        let name_length_bytes = extract_bytes_u16(self.file_name_length);
         [
-            (self.flags & 0xFF00 >> 8) as u8, (self.flags & 0x00FF) as u8, 
-            (self.file_name_length & 0xFF00 >> 8) as u8, (self.file_name_length & 0x00FF) as u8, 
-            0,0,0,0
+            flag_bytes.0,
+            flag_bytes.1,
+            name_length_bytes.0,
+            name_length_bytes.1,
+            0,
+            0,
+            0,
+            0,
         ]
     }
 }
@@ -62,12 +86,20 @@ impl CommandPrefix for WritePrefix {
         })
     }
 
-    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
+    fn serialize(&self) -> [u8; PREFIX_LENGTH] {
+        let flag_bytes = extract_bytes_u16(self.flags);
+        let name_length_bytes = extract_bytes_u16(self.file_name_length);
+        let file_length_bytes = extract_bytes_u32(self.file_length);
+
         [
-            (self.flags & 0xFF00 >> 8) as u8, (self.flags & 0x00FF) as u8, 
-            (self.file_name_length & 0xFF00 >> 8) as u8, (self.file_name_length & 0x00FF) as u8, 
-            (self.file_length & 0xFF000000 >> 24) as u8, (self.file_length & 0x00FF0000 >> 16) as u8, 
-            (self.file_length & 0xFF00 >> 8) as u8, (self.file_length & 0x00FF) as u8, 
+            flag_bytes.0,
+            flag_bytes.1,
+            name_length_bytes.0,
+            name_length_bytes.1,
+            file_length_bytes.0,
+            file_length_bytes.1,
+            file_length_bytes.2,
+            file_length_bytes.3,
         ]
     }
 }
@@ -85,10 +117,10 @@ impl CommandPrefix for Prefixes {
             .or(ReadPrefix::parse_prefix(prefix).map(|r| Prefixes::Read(r)))
     }
 
-    fn serialize(&self) -> [u8 ; PREFIX_LENGTH] {
+    fn serialize(&self) -> [u8; PREFIX_LENGTH] {
         match self {
-            Prefixes::Write(w) => w.serialize(), 
-            Prefixes::Read(r) => r.serialize()
+            Prefixes::Write(w) => w.serialize(),
+            Prefixes::Read(r) => r.serialize(),
         }
     }
 }
