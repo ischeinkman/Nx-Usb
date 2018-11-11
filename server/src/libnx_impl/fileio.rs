@@ -1,34 +1,31 @@
-use commands::FileWriter;
 use commands::FileReader;
+use commands::FileWriter;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 use std::io::Write;
-
+use std::path::Path;
 
 pub struct StdFileWriter {
-    file : File,
+    file: File,
 }
 
 impl FileWriter for StdFileWriter {
-
     fn new(file_name: &str) -> Result<Self, String> {
         let pt = Path::new(file_name);
-        //For now we will error on file update b/c we're still not production-grade. 
+        //For now we will error on file update b/c we're still not production-grade.
         if pt.exists() {
             Err(format!("File with name {} already exists!", file_name).to_owned())
+        } else {
+            let fl =
+                File::create(pt).map_err(|e| format!("File create err: {:?}", e).to_owned())?;
+            Ok(StdFileWriter { file: fl })
         }
-        else {
-            let fl = File::create(pt).map_err(|e| format!("File create err: {:?}", e).to_owned())?;
-            Ok(StdFileWriter {
-                file : fl,
-            })
-        }
-        
     }
 
     fn write_bytes(&mut self, buffer: &[u8]) -> Result<usize, String> {
-        self.file.write(buffer).map_err(|e| format!("File write error: {:?}", e).to_owned())
+        self.file
+            .write(buffer)
+            .map_err(|e| format!("File write error: {:?}", e).to_owned())
     }
 }
 
@@ -57,7 +54,10 @@ impl FileReader for StdFileReader {
     }
 
     fn len(&self) -> usize {
-        self.file.as_ref().and_then(|f| f.metadata().ok()).map_or(0, |m| m.len() as usize)
+        self.file
+            .as_ref()
+            .and_then(|f| f.metadata().ok())
+            .map_or(0, |m| m.len() as usize)
     }
 
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {

@@ -1,4 +1,4 @@
-use super::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
+use nxusb::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
 
 pub trait ServerCommandState<T: CommandPrefix> {
     /// Initialized a new, unstarted command environment from a command prefix.
@@ -40,7 +40,7 @@ pub trait FileReader: Sized {
     /// Creates a handle to the object to be read
     fn new(file_name: &str) -> Result<Self, String>;
 
-    /// Gets the number of bytes in this File. 
+    /// Gets the number of bytes in this File.
     fn len(&self) -> usize;
 
     /// Reads the next bytes to the given buffer, returning the number of bytes read.
@@ -49,7 +49,9 @@ pub trait FileReader: Sized {
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String>;
 }
 
-impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix> for ReadCommandState<FileReaderType> {
+impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
+    for ReadCommandState<FileReaderType>
+{
     fn from_prefix(prefix: ReadPrefix) -> Self {
         let ln = prefix.file_name_length as usize;
         ReadCommandState {
@@ -92,20 +94,21 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix> for ReadCommandS
         let buffer_idx_begin = if self.file.is_none() {
             let fl = FileReaderType::new(&self.file_name)?;
             let fl_len = fl.len();
-            buffer[0] = ((fl_len & 0xFF000000) >> 24) as u8; 
-            buffer[1] = ((fl_len & 0xFF0000) >> 16) as u8; 
-            buffer[2] = ((fl_len & 0xFF00) >> 8) as u8; 
-            buffer[3] = (fl_len & 0xFF) as u8; 
+            buffer[0] = ((fl_len & 0xFF000000) >> 24) as u8;
+            buffer[1] = ((fl_len & 0xFF0000) >> 16) as u8;
+            buffer[2] = ((fl_len & 0xFF00) >> 8) as u8;
+            buffer[3] = (fl_len & 0xFF) as u8;
             self.file = Some(fl);
             4
-        } 
-        else { 0 };
+        } else {
+            0
+        };
         let fl = if let Some(f) = &mut self.file {
             f
         } else {
             return Ok(0);
         };
-        let read_bytes = fl.read_bytes(&mut buffer[buffer_idx_begin ..])?;
+        let read_bytes = fl.read_bytes(&mut buffer[buffer_idx_begin..])?;
         if read_bytes < buflen {
             self.finished = true;
         }
@@ -169,8 +172,8 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
         }
         //The entire block is for the file content.
         else if name_bytes_to_get == 0 && file_bytes_to_get > 0 {
-            //TODO: This is just a series of borrow checker manipulations to 
-            // short-circuit set self.file and then use it. 
+            //TODO: This is just a series of borrow checker manipulations to
+            // short-circuit set self.file and then use it.
             if self.file.is_none() {
                 let fl = WriterType::new(&self.file_name)?;
                 self.file = Some(fl);
@@ -182,9 +185,9 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
                     self.write_idx += n;
                 }
                 rval
-            } 
+            }
             // Since we previously set self.file in the None case and short-circuited
-            // if it didn't work, this branch should be impossible to reach. 
+            // if it didn't work, this branch should be impossible to reach.
             else {
                 Err("File is somehow None after the branch!".to_owned())
             }
