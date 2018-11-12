@@ -1,4 +1,4 @@
-use nxusb::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
+use nxusb::prefixes::{CommandPrefix, ReadPrefix, WritePrefix, Prefixes};
 
 pub trait ServerCommandState<T: CommandPrefix> {
     /// Initialized a new, unstarted command environment from a command prefix.
@@ -217,4 +217,48 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
     fn output_block(&mut self, _buffer: &mut [u8]) -> Result<usize, String> {
         Ok(0)
     }
+}
+
+pub enum CommandStates<T : FileReader, U : FileWriter> {
+    Read(ReadCommandState<T>), 
+    Write(WriteCommandState<U>),
+}
+
+impl <T : FileReader, U : FileWriter> ServerCommandState<Prefixes> for CommandStates<T, U> {
+    fn from_prefix(prefix: Prefixes) -> Self {
+        match prefix {
+            Prefixes::Read(r) => CommandStates::Read(ReadCommandState::from_prefix(r)), 
+            Prefixes::Write(w) => CommandStates::Write(WriteCommandState::from_prefix(w))
+        }
+    }
+
+    fn needs_input(&self) -> bool {
+        match self {
+            &CommandStates::Read(ref r) => r.needs_input(), 
+            &CommandStates::Write(ref w) => w.needs_input()
+        }
+    }
+
+    fn input_block(&mut self, block: &[u8]) -> Result<usize, String> {
+        match self {
+            &mut CommandStates::Read(ref mut r) => r.input_block( block), 
+            &mut CommandStates::Write(ref mut w) => w.input_block(block)
+        }
+    }
+
+    fn needs_output(&self) -> bool {
+        match self {
+            &CommandStates::Read(ref r) => r.needs_output(), 
+            &CommandStates::Write(ref w) => w.needs_output()
+        }
+    }
+
+    fn output_block(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        match self {
+            &mut CommandStates::Read(ref mut r) => r.output_block(buffer), 
+            &mut CommandStates::Write(ref mut w) => w.output_block(buffer)
+        }
+
+    }
+
 }

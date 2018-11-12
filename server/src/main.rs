@@ -1,13 +1,16 @@
 extern crate libc;
 
 pub mod commands;
+use commands::{ServerCommandState, CommandStates};
 
 pub mod interface;
+use interface::ServerDevice;
 
 extern crate nxusb;
 pub use nxusb::prefixes;
 
 pub mod libnx_impl;
+use libnx_impl::{StdFileReader, StdFileWriter};
 
 pub mod test_impl;
 
@@ -21,13 +24,13 @@ use std::result::Result;
 extern crate libnx_rs;
 use libnx_rs::{console, usbcomms};
 pub fn main() {
-    let mut stderr = match redirect_stderr("nxusb.stderr.txt") {
+    let mut stderr = match redirect_stderr("nxusb_server.stderr.txt") {
         Ok(f) => f,
         Err(_) => {
             return;
         }
     };
-    let rval = panic::catch_unwind(runner);
+    let rval = panic::catch_unwind(server_runner);
     if let Err(_) = rval {
         eprintln!("Caught a panic in runner!");
     } else if let Ok(Err(e)) = rval {
@@ -37,7 +40,7 @@ pub fn main() {
     let _f = stderr.flush();
 }
 
-pub fn runner() -> Result<(), String> {
+pub fn test_runner() -> Result<(), String> {
     eprintln!("Initing console.");
     let mut debug = console::ConsoleHandle::default();
     let mut usb_interface = [usbcomms::UsbCommsInterface::default()];
@@ -62,6 +65,74 @@ pub fn runner() -> Result<(), String> {
         eprintln!("Reading bytes from interface {:?}", usb_interface);
         usb_interface[0].read_bytes(&mut echo_buffer);
         debug.update();
+    }
+    Ok(())
+}
+
+pub fn server_runner() -> Result<(), String> {
+    eprintln!("Initing console.");
+    let mut debug = console::ConsoleHandle::default();
+    let mut usb_interfaces = [usbcomms::UsbCommsInterface::default()];
+    eprintln!("Initing interface array{:?}", usb_interfaces);
+    eprintln!("Initing UsbCommsContext.");
+    let _usb_context = usbcomms::UsbCommsContext::initialize(&mut usb_interfaces)
+        .map_err(|e| format!("Libnx Error: {:?}", e))?;
+
+    let usb_interface = &mut usb_interfaces[0];
+
+    let mut hid_handle = libnx_rs::hid::HidContext {};
+    let controller_handle = hid_handle.get_controller(libnx_rs::hid::HidControllerID::CONTROLLER_P1_AUTO);
+    let mut current_command : Option<CommandStates<StdFileReader, StdFileWriter>> = None; 
+    loop {
+        hid_handle.scan_input();
+        if controller_handle.keys_down_raw() & 1024 != 0 {
+            break;
+        }
+        
+        debug.update();
+        
+        if current_command.is_none() {
+            println!("Waiting for command prefix.");
+            debug.update();
+            let prefix = usb_interface.read_prefix()?;
+            println!("Found command prefix {:?}", prefix);
+            debug.update();
+            let command = CommandStates::from_prefix(prefix);
+            current_command = Some(command);
+        }
+
+        let finished = {
+            let command : &mut CommandStates<StdFileReader, StdFileWriter> = current_command.as_mut().ok_or("Error: current command shouldn't be None.")?;
+            if command.needs_input() {
+                println!("Passing block of input to the current command.");
+                let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
+                buffer.resize(usb_interface.block_size(), 0);
+                usb_interface.read_block(&mut buffer)?;
+                println!("Read block.");
+                command.input_block(&buffer)?;
+                println!("Passed input block.");
+                false
+            }
+            else if command.needs_output() {
+                println!("Retrieving block of output from the current command.");
+                let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
+                buffer.resize(usb_interface.block_size(), 0);
+                command.output_block(&mut buffer)?;
+                println!("Got bytes to output.");
+                usb_interface.write_block(&mut buffer)?;
+                println!("Retrieved output block.");
+                false
+            }
+            else {
+                println!("Finished command.");
+                true
+            }
+        };
+
+        if finished {
+            current_command = None;
+        }
+
     }
     Ok(())
 }
