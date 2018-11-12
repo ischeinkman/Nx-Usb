@@ -1,0 +1,15 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["ischeinkman <scheinkman.ilan@gmail.com>"]
+
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
+[dependencies.nxusb]
+path = "../"
+
+[dependencies]
+libusb = "0.3.0"
