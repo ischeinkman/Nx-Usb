@@ -1,4 +1,4 @@
-use nxusb::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
+use nxusb::prefixes::{CommandPrefix, ReadPrefix};
 
 pub trait ClientCommandState<T: CommandPrefix> {
     fn prefix(&self) -> T;
@@ -29,6 +29,7 @@ impl<StoreType: FileContentStorer> ReadState<StoreType> {
         file_name: &str,
         output_name: &str,
     ) -> Result<Self, String> {
+        println!("Now starting read of file {} to local storage {}.", file_name, output_name);
         if prefix.file_name_length != file_name.len() as u16 {
             Err(format!("Could not verify prefix matches this file: got name {:?} which doesn't have length {}", file_name, prefix.file_name_length))
         } else {
@@ -63,6 +64,7 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
             cur_pushed += 1;
         }
         self.push_idx += cur_pushed;
+        println!("Now pushing block: {:?}", block);
         Ok(cur_pushed)
     }
 
@@ -74,6 +76,8 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
         let block_sz = buffer.len();
         let mut cur_pulled = 0;
 
+        println!("Now processing pulled block {:?}", buffer);
+
         //Extract the file length 
         while self.pull_idx + cur_pulled < 4 && cur_pulled < block_sz {
             let read_byte = buffer[cur_pulled];
@@ -82,6 +86,12 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
             self.file_size |= (read_byte as usize) << bit_offset;
             cur_pulled += 1;
         }
+        if self.pull_idx + cur_pulled < 4 {
+            self.pull_idx += cur_pulled;
+            return Ok(cur_pulled);
+        }
+
+        println!("Now have {}/{} bytes of the file {}.", self.pull_idx + cur_pulled - 4, self.file_size, self.file_name);
 
         if self.store.is_none() {
             let fl = StoreType::for_name(&self.output_name, self.file_size)?;

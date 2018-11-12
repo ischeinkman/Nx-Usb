@@ -1,3 +1,4 @@
+#![cfg(test)]
 use commands::{ClientCommandState, FileContentStorer, FileRetriever, ReadState};
 use interface::ClientDevice;
 use nxusb::prefixes::{CommandPrefix, Prefixes, ReadPrefix, WritePrefix, PREFIX_LENGTH};
@@ -22,7 +23,6 @@ impl TestFileContext {
         CONTEXT.as_mut().unwrap()
     }
 }
-
 pub struct TestFile {
     name: String,
     read_idx: usize,
@@ -51,12 +51,12 @@ impl FileRetriever for TestFile {
 }
 
 #[derive(Debug)]
-pub struct TestFileStorer {
+struct TestFileStorer {
     name: String,
 }
 
 impl FileContentStorer for TestFileStorer {
-    fn for_name(name: &str, size: usize) -> Result<Self, String> {
+    fn for_name(name: &str, _size: usize) -> Result<Self, String> {
         let name = name.to_owned();
         unsafe {
             TestFileContext::get_context()

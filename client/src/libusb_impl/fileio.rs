@@ -2,7 +2,6 @@
 use commands::{FileContentStorer, FileRetriever};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
 
 pub struct StdFile {
     path : String,
@@ -10,7 +9,7 @@ pub struct StdFile {
 }
 impl FileContentStorer for StdFile {
     fn for_name(name : &str, _size : usize) -> Result<Self, String>  {
-
+        println!("Creating new file store: {}", name);
         let file = File::create(name).map_err(|e| format!("Error creating file: {:?}", e))?;
 
         Ok(StdFile {

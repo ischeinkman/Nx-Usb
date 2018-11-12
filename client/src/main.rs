@@ -1,7 +1,7 @@
 extern crate libusb;
 extern crate nxusb;
 
-use nxusb::prefixes::{Prefixes, ReadPrefix, WritePrefix, PREFIX_LENGTH};
+use nxusb::prefixes::{Prefixes, ReadPrefix};
 
 pub mod interface;
 use interface::ClientDevice;
@@ -84,72 +84,11 @@ fn copy_from_switch(
             command_state.pull_block(&buffer)?;
         } else if command_state.needs_push() {
             println!("Trying to push for a read.");
-            client.push_block(&buffer)?;
             command_state.push_block(&mut buffer)?;
+            client.push_block(&buffer)?;
         } else {
             break;
         }
     }
     Ok(command_state.file_size)
-}
-
-fn usb_basic_test(usb_ctx: &mut libusb::Context) -> Result<(), String> {
-    let devices = usb_ctx
-        .devices()
-        .map_err(|e| format!("Device iter create err: {:?}", e))?;
-    for device in devices.iter() {
-        println!("\n\n");
-        match test_device(device) {
-            Ok(_) => {}
-            Err(e) => eprintln!("Found err testing device: {:?}", e),
-        }
-    }
-    Ok(())
-}
-fn test_device(device: libusb::Device) -> Result<(), String> {
-    let timeout = std::time::Duration::from_millis(100);
-    let desc = device
-        .device_descriptor()
-        .map_err(|e| format!("Error getting desc: {:?}", e))?;
-    let conf = device
-        .active_config_descriptor()
-        .map_err(|e| format!("Error getting conf: {:?}", e))?;
-    let mut handle: libusb::DeviceHandle = match device.open() {
-        Ok(d) => d,
-        Err(e) => {
-            return Err(format!("Found error reading device {:?}: {:?}", desc, e));
-        }
-    };
-    let _ = handle.reset().map_err(|e| format!("Reset err: {:?}", e))?;
-
-    let langs: Vec<libusb::Language> = handle.read_languages(timeout).unwrap();
-    let lang = langs
-        .into_iter()
-        .find(|l| l.primary_language() == libusb::PrimaryLanguage::English)
-        .unwrap();
-    println!(
-        "Found device {:?} (Serial : {:?}) by {:?}",
-        handle
-            .read_product_string(lang, &desc, timeout)
-            .map_err(|e| format!("Device prod read err: {:?}", e))?,
-        handle
-            .read_manufacturer_string(lang, &desc, timeout)
-            .map_err(|e| format!("Device manu read err: {:?}", e))?,
-        handle
-            .read_serial_number_string(lang, &desc, timeout)
-            .map_err(|e| format!("Device serial read err: {:?}", e))?
-    );
-    println!("Vid: {}, Pid: {}", desc.vendor_id(), desc.product_id());
-
-    for iface in conf.interfaces() {
-        println!("Found iface number {}.", iface.number());
-        for iface_desc in iface.descriptors() {
-            println!("Found iface_desc: {:?}", iface_desc);
-            for endpt_desc in iface_desc.endpoint_descriptors() {
-                println!("Found endpoint_desc: {:?}", endpt_desc);
-            }
-        }
-    }
-
-    Ok(())
 }

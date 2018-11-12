@@ -4,7 +4,20 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-
+use std::fs::OpenOptions;
+use std::os::unix::fs::MetadataExt;
+use std::io::Seek;
+use libnx_rs::fs::{FileSystem};
+macro_rules! dprintln {
+    () => ({
+        println!();
+        eprintln!();
+    });
+    ($($arg:tt)*) => ({
+        println!($($arg)*);
+        eprintln!($($arg)*);
+    })
+}
 pub struct StdFileWriter {
     file: File,
 }
@@ -33,47 +46,69 @@ pub struct StdFileReader {
     path: String,
     file: Option<File>,
     idx: usize,
+    file_len : usize, 
     finished: bool,
 }
 
+const LEN_BUFFER_SIZE : usize = 4 * 1024 * 1024;
 impl FileReader for StdFileReader {
     fn new(file_name: &str) -> Result<Self, String> {
         let pt = Path::new(file_name);
-        let file: Option<File> = if pt.is_file() {
-            Some(File::open(pt).map_err(|e| format!("File open error: {:?}", e).to_owned())?)
+        dprintln!("Creating StdFileReader for file {}.", file_name);
+        let (file, ln): (Option<File>, usize) = if !file_name.ends_with('/') {
+            dprintln!("It's a file; now opening.");
+            let mut fl = File::open(pt).map_err(|e| format!("File open error: {:?}", e).to_owned())?;
+
+            let mut ln : usize = 0; 
+            let mut garbage : Vec<u8> = Vec::with_capacity(LEN_BUFFER_SIZE);
+            garbage.resize(LEN_BUFFER_SIZE, 0);
+            let mut rd;
+            loop {
+                rd = fl.read(&mut garbage).map_err(|e| format!("Fl.read error when calcing size: {:?}",e))?;
+                ln += rd;
+                if rd == 0 {
+                    break;
+                }
+            }
+            fl.seek(std::io::SeekFrom::Start(0)).map_err(|e| format!("Seek err: {:?}", e))?;
+            (Some(fl), ln)
         } else {
-            None
+            dprintln!("Not a file.");
+            (None, 0)
         };
 
         Ok(StdFileReader {
             path: file_name.to_owned(),
             file,
             idx: 0,
+            file_len : ln,  
             finished: !pt.exists(),
         })
     }
 
     fn len(&self) -> usize {
-        self.file
-            .as_ref()
-            .and_then(|f| f.metadata().ok())
-            .map_or(0, |m| m.len() as usize)
+        self.file_len
     }
 
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         let buflen = buffer.len();
         if self.finished {
+            dprintln!("Am finished; not reading.");
             Ok(0)
         } else if let Some(fl) = &mut self.file {
+            dprintln!("Reading from file.");
             let rd = fl
                 .read(buffer)
                 .map_err(|e| format!("File read error: {:?}", e).to_owned())?;
             self.idx += rd;
             if rd < buflen {
+                dprintln!("We think we finished reading: wanted to read {} but only read {}", buflen, rd);
                 self.finished = true;
             }
+            dprintln!("Read {} bytes from the file.", rd);
             Ok(rd)
         } else {
+            dprintln!("Reading from directory path.");
             let dirpath = Path::new(&self.path);
             let ents = dirpath
                 .read_dir()

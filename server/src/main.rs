@@ -23,6 +23,17 @@ use std::result::Result;
 
 extern crate libnx_rs;
 use libnx_rs::{console, usbcomms};
+
+macro_rules! dprintln {
+    () => ({
+        println!();
+        eprintln!();
+    });
+    ($($arg:tt)*) => ({
+        println!($($arg)*);
+        eprintln!($($arg)*);
+    })
+}
 pub fn main() {
     let mut stderr = match redirect_stderr("nxusb_server.stderr.txt") {
         Ok(f) => f,
@@ -32,37 +43,37 @@ pub fn main() {
     };
     let rval = panic::catch_unwind(server_runner);
     if let Err(_) = rval {
-        eprintln!("Caught a panic in runner!");
+        dprintln!("Caught a panic in runner!");
     } else if let Ok(Err(e)) = rval {
-        eprintln!("Runner got an error : {:?}", e);
+        dprintln!("Runner got an error : {:?}", e);
     }
 
     let _f = stderr.flush();
 }
 
 pub fn test_runner() -> Result<(), String> {
-    eprintln!("Initing console.");
+    dprintln!("Initing console.");
     let mut debug = console::ConsoleHandle::default();
     let mut usb_interface = [usbcomms::UsbCommsInterface::default()];
-    eprintln!("Initing interface array{:?}", usb_interface);
-    eprintln!("Initing UsbCommsContext.");
+    dprintln!("Initing interface array{:?}", usb_interface);
+    dprintln!("Initing UsbCommsContext.");
     let _usb_context = usbcomms::UsbCommsContext::initialize(&mut usb_interface)
         .map_err(|e| format!("Libnx Error: {:?}", e))?;
-    eprintln!("Creating empty echo_buffer.");
+    dprintln!("Creating empty echo_buffer.");
     let mut echo_buffer = [0u8; 100];
     while echo_buffer[0..4] != [b'q', b'u', b'i', b't'] {
-        println!(
+        dprintln!(
             "Writing bytes to interface {:?}: {:?}",
             usb_interface,
             echo_buffer.as_ref()
         );
-        eprintln!(
+        dprintln!(
             "Writing bytes to interface {:?}: {:?}",
             usb_interface,
             echo_buffer.as_ref()
         );
         usb_interface[0].write_bytes(&mut echo_buffer);
-        eprintln!("Reading bytes from interface {:?}", usb_interface);
+        dprintln!("Reading bytes from interface {:?}", usb_interface);
         usb_interface[0].read_bytes(&mut echo_buffer);
         debug.update();
     }
@@ -70,11 +81,11 @@ pub fn test_runner() -> Result<(), String> {
 }
 
 pub fn server_runner() -> Result<(), String> {
-    eprintln!("Initing console.");
+    dprintln!("Initing console.");
     let mut debug = console::ConsoleHandle::default();
     let mut usb_interfaces = [usbcomms::UsbCommsInterface::default()];
-    eprintln!("Initing interface array{:?}", usb_interfaces);
-    eprintln!("Initing UsbCommsContext.");
+    dprintln!("Initing interface array{:?}", usb_interfaces);
+    dprintln!("Initing UsbCommsContext.");
     let _usb_context = usbcomms::UsbCommsContext::initialize(&mut usb_interfaces)
         .map_err(|e| format!("Libnx Error: {:?}", e))?;
 
@@ -92,10 +103,10 @@ pub fn server_runner() -> Result<(), String> {
         debug.update();
         
         if current_command.is_none() {
-            println!("Waiting for command prefix.");
+            dprintln!("Waiting for command prefix.");
             debug.update();
             let prefix = usb_interface.read_prefix()?;
-            println!("Found command prefix {:?}", prefix);
+            dprintln!("Found command prefix {:?}", prefix);
             debug.update();
             let command = CommandStates::from_prefix(prefix);
             current_command = Some(command);
@@ -104,27 +115,27 @@ pub fn server_runner() -> Result<(), String> {
         let finished = {
             let command : &mut CommandStates<StdFileReader, StdFileWriter> = current_command.as_mut().ok_or("Error: current command shouldn't be None.")?;
             if command.needs_input() {
-                println!("Passing block of input to the current command.");
+                dprintln!("Passing block of input to the current command.");
                 let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
                 buffer.resize(usb_interface.block_size(), 0);
                 usb_interface.read_block(&mut buffer)?;
-                println!("Read block.");
+                dprintln!("Read block.");
                 command.input_block(&buffer)?;
-                println!("Passed input block.");
+                dprintln!("Passed input block.");
                 false
             }
             else if command.needs_output() {
-                println!("Retrieving block of output from the current command.");
+                dprintln!("Retrieving block of output from the current command.");
                 let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
                 buffer.resize(usb_interface.block_size(), 0);
                 command.output_block(&mut buffer)?;
-                println!("Got bytes to output.");
+                dprintln!("Got bytes to output.");
                 usb_interface.write_block(&mut buffer)?;
-                println!("Retrieved output block.");
+                dprintln!("Retrieved output block.");
                 false
             }
             else {
-                println!("Finished command.");
+                dprintln!("Finished command.");
                 true
             }
         };
@@ -164,3 +175,5 @@ pub fn redirect_stderr(filename: &str) -> Result<File, String> {
         Ok(outfile)
     }
 }
+
+

@@ -27,9 +27,8 @@ impl<'a> UsbClient<'a> {
         let (mut device, device_desc, mut device_handle) = open_device(ctx, vid, pid)?;
         let (read_endpoint, write_endpoint) = find_bulk_endpoints(&mut device, &device_desc)?;
         device_handle.reset().map_err(|e| format!("Found reset err: {:?}", e))?;
+        device_handle.set_active_configuration(read_endpoint.0.config).map_err(|e| format!("Could not set active config: {:?}", e))?;
         device_handle.claim_interface(read_endpoint.0.iface).map_err(|e| format!("Could not claim iface {}: {:?}", read_endpoint.0.iface, e))?;
-        //device_handle.unconfigure().map_err(|e| format!("Unconfigure err: {:?}", e))?;
-        //device_handle.set_active_configuration(read_endpoint.0.config).map_err(|e| format!("Could not set active config: {:?}", e))?;
         Ok(UsbClient {
             device_handle, 
             read_endpoint, 
@@ -38,7 +37,7 @@ impl<'a> UsbClient<'a> {
     }
 }
 
-const CLIENT_BLOCK_SIZE : usize = 256;
+const CLIENT_BLOCK_SIZE : usize = 1024 ;
 impl<'a> ClientDevice for UsbClient<'a> {
     fn push_prefix(&mut self, prefix: Prefixes) -> Result<usize, String> {
         let bts = prefix.serialize();
@@ -91,8 +90,6 @@ fn find_bulk_endpoints(
     desc: &DeviceDescriptor,
 ) -> Result<(ReadEndpoint, WriteEndpoint), String> {
     println!("Now checking for endpoints.");
-    let mut read_endpoint: Option<ReadEndpoint> = None;
-    let mut write_endpoint: Option<WriteEndpoint> = None;
     for config_idx in 0..desc.num_configurations() {
         let config_desc = match device.config_descriptor(config_idx) {
             Ok(c) => c,
@@ -110,31 +107,25 @@ fn find_bulk_endpoints(
                     .endpoint_descriptors()
                     .filter(|endpoint_desc| endpoint_desc.transfer_type() == TransferType::Bulk)
                     .partition(|endpoint_desc| endpoint_desc.direction() == libusb::Direction::In);
+                if read_endpoints.len() != 1 || write_endpoints.len() != 1 {
+                    continue;
+                }
+                let read_desc = read_endpoints.pop().unwrap();
+                let read_endpoint = Endpoint {
+                    config : config_desc.number(),
+                    iface : interface_desc.interface_number(), 
+                    setting : interface_desc.setting_number(), 
+                    address : read_desc.address()
+                };
+                let write_desc = write_endpoints.pop().unwrap();
+                let write_endpoint = Endpoint {
+                    config : config_desc.number(),
+                    iface : interface_desc.interface_number(), 
+                    setting : interface_desc.setting_number(), 
+                    address : write_desc.address()
+                };
 
-                let read_ifaces = read_endpoints.len() + read_endpoint.map_or(0, |_| 1);
-                if read_ifaces > 1 {
-                    return Err("Found too many read_endpoints!".to_owned());
-                }
-                let write_ifaces = write_endpoints.len() + write_endpoint.map_or(0, |_| 1);
-                if write_ifaces > 1 {
-                    return Err("Found too many write_endpoints!".to_owned());
-                }
-                read_endpoint = read_endpoints.pop().map(|endpoint_desc|ReadEndpoint(Endpoint {
-                    config : config_desc.number(), 
-                    iface : interface_desc.interface_number(), 
-                    setting : interface_desc.setting_number(), 
-                    address : endpoint_desc.address(), 
-                }));
-                write_endpoint = write_endpoints.pop().map(|endpoint_desc|WriteEndpoint(Endpoint {
-                    config : config_desc.number(), 
-                    iface : interface_desc.interface_number(), 
-                    setting : interface_desc.setting_number(), 
-                    address : endpoint_desc.address(), 
-                }));
-                println!("Have endpoints {:?}, {:?}", read_endpoint, write_endpoint);
-                if read_endpoint.is_some() && write_endpoint.is_some() {
-                    return Ok((read_endpoint.unwrap(), write_endpoint.unwrap()));
-                }
+                return Ok((ReadEndpoint(read_endpoint), WriteEndpoint(write_endpoint)));
             }
         }
     }

@@ -2,19 +2,24 @@ use interface::ServerDevice;
 use libnx_rs::usbcomms::UsbCommsInterface;
 use nxusb::prefixes::{CommandPrefix, Prefixes, PREFIX_LENGTH};
 
-const TEST_BLOCK_SIZE: usize = 4096;
+const TEST_BLOCK_SIZE: usize = 1024;
 impl ServerDevice for UsbCommsInterface {
     fn read_prefix(&mut self) -> Result<Prefixes, String> {
         let mut prefix_buff: [u8; PREFIX_LENGTH] = [0; PREFIX_LENGTH];
-        let read_bytes = self.read_bytes(&mut prefix_buff);
-        match read_bytes {
-            PREFIX_LENGTH => Prefixes::parse_prefix(prefix_buff)
-                .ok_or(format!("Could not parse bytes {:?}", prefix_buff).to_owned()),
-            0 => Err("Read 0 bytes for prefix. Is this interface initialized?".to_owned()),
-            n => Err(format!(
-                "Bad read prefix result: expected {} but read {} bytes instead.",
-                PREFIX_LENGTH, n
-            ).to_owned()),
+        let mut read_idx = 0;
+        let mut read_count = 0;
+        while read_idx < PREFIX_LENGTH && read_count < 4{
+            let read_bytes = self.read_bytes(&mut prefix_buff[read_idx..]);
+            println!("ReadPrefix attempt {}: got {} bytes.", read_count, read_bytes);
+            read_idx += read_bytes;
+            read_count += 1;
+        }
+        if read_idx == PREFIX_LENGTH {
+            Prefixes::parse_prefix(prefix_buff)
+                .ok_or(format!("Could not parse bytes {:?}", prefix_buff).to_owned())
+        }
+        else {
+            Err(format!("Only retrieved {} bytes out of {}. Buffer {:?}", read_idx, PREFIX_LENGTH, prefix_buff))
         }
     }
 

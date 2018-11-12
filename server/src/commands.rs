@@ -70,7 +70,7 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
         let start_len = self.file_name.len();
         let need_bytes = self.prefix.file_name_length as usize - start_len;
         let block_size = block.len();
-
+        println!("Now reading block: {:?}", block);
         if need_bytes > block_size {
             let part = String::from_utf8(block.to_vec())
                 .map_err(|e| format!("UTF8 Error: {:?}", e).to_owned())?;
@@ -94,6 +94,7 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
         let buffer_idx_begin = if self.file.is_none() {
             let fl = FileReaderType::new(&self.file_name)?;
             let fl_len = fl.len();
+            println!("Now starting output of file {} with size {}.", self.file_name, fl_len);
             buffer[0] = ((fl_len & 0xFF000000) >> 24) as u8;
             buffer[1] = ((fl_len & 0xFF0000) >> 16) as u8;
             buffer[2] = ((fl_len & 0xFF00) >> 8) as u8;
@@ -106,10 +107,11 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
         let fl = if let Some(f) = &mut self.file {
             f
         } else {
+            println!("Could not find file {}.", self.file_name);
             return Ok(0);
         };
         let read_bytes = fl.read_bytes(&mut buffer[buffer_idx_begin..])?;
-        if read_bytes < buflen {
+        if read_bytes < buflen - buffer_idx_begin {
             self.finished = true;
         }
         Ok(read_bytes)
