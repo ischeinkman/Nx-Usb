@@ -1,5 +1,15 @@
-use nxusb::prefixes::{CommandPrefix, ReadPrefix};
+use nxusb::prefixes::{CommandPrefix, ReadPrefix, WritePrefix};
 
+macro_rules! dprintln {
+    () => ({
+        println!();
+        eprintln!();
+    });
+    ($($arg:tt)*) => ({
+        println!($($arg)*);
+        eprintln!($($arg)*);
+    })
+}
 pub trait ClientCommandState<T: CommandPrefix> {
     fn prefix(&self) -> T;
 
@@ -23,13 +33,14 @@ pub struct ReadState<StoreType: FileContentStorer> {
     pub file_size: usize,
 }
 
+
 impl<StoreType: FileContentStorer> ReadState<StoreType> {
     pub fn new_read(
         prefix: ReadPrefix,
         file_name: &str,
         output_name: &str,
     ) -> Result<Self, String> {
-        println!("Now starting read of file {} to local storage {}.", file_name, output_name);
+        dprintln!("Now starting read of file {} to local storage {}.", file_name, output_name);
         if prefix.file_name_length != file_name.len() as u16 {
             Err(format!("Could not verify prefix matches this file: got name {:?} which doesn't have length {}", file_name, prefix.file_name_length))
         } else {
@@ -64,7 +75,7 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
             cur_pushed += 1;
         }
         self.push_idx += cur_pushed;
-        println!("Now pushing block: {:?}", block);
+        dprintln!("Now pushing block: {:?}", block);
         Ok(cur_pushed)
     }
 
@@ -76,7 +87,7 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
         let block_sz = buffer.len();
         let mut cur_pulled = 0;
 
-        println!("Now processing pulled block {:?}", buffer);
+        dprintln!("Now processing pulled block {:?}", buffer);
 
         //Extract the file length 
         while self.pull_idx + cur_pulled < 4 && cur_pulled < block_sz {
@@ -91,7 +102,7 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
             return Ok(cur_pulled);
         }
 
-        println!("Now have {}/{} bytes of the file {}.", self.pull_idx + cur_pulled - 4, self.file_size, self.file_name);
+        dprintln!("Now have {}/{} bytes of the file {}.", self.pull_idx + cur_pulled - 4, self.file_size, self.file_name);
 
         if self.store.is_none() {
             let fl = StoreType::for_name(&self.output_name, self.file_size)?;
@@ -115,8 +126,64 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
     }
 }
 
+pub struct WriteState<FileType : FileRetriever> {
+    pub prefix : WritePrefix, 
+    pub file : FileType, 
+    pub switch_name : String, 
+    push_idx : usize, 
+}
+impl <FileType : FileRetriever>  WriteState<FileType> { 
+    pub fn new_write(prefix : WritePrefix, switch_path : &str, computer_path : &str) -> Result<Self, String> {
+        let file = FileType::open_file(computer_path)?;
+        if switch_path.len() != prefix.file_name_length as usize {
+            return Err(format!("Error verifying prefix: path {} does not have length {}.", switch_path, prefix.file_name_length));
+        }
+        Ok(WriteState {
+            prefix, 
+            file, 
+            switch_name : switch_path.to_owned(), 
+            push_idx : 0
+        })
+    }
+}
+impl <FileType : FileRetriever> ClientCommandState<WritePrefix> for WriteState<FileType> {
+    fn prefix(&self) -> WritePrefix {
+        self.prefix
+    }
+
+    fn needs_push(&self) -> bool {
+        self.push_idx < self.prefix.file_length as usize + self.prefix().file_name_length as usize
+    }
+
+    fn push_block(&mut self, block: &mut [u8]) -> Result<usize, String> {
+        dprintln!("Entered write push.");
+        let mut cur_pushed = 0; 
+        while self.push_idx + cur_pushed < self.prefix.file_name_length as usize && cur_pushed < block.len() {
+            block[cur_pushed] = self.switch_name.as_bytes()[self.push_idx + cur_pushed];
+            cur_pushed += 1;
+        }
+        dprintln!("Finished pushing name; starting file.");
+        while self.push_idx + cur_pushed < self.prefix.file_length  as usize && cur_pushed < block.len() {
+            let space_left = &mut block[cur_pushed ..];
+            cur_pushed += self.file.read_bytes(space_left)?;
+        }
+        self.push_idx += cur_pushed;
+        Ok(cur_pushed)
+    }
+
+    fn needs_pull(&self) -> bool {
+        false
+    }
+
+    fn pull_block(&mut self, _buffer: &[u8]) -> Result<usize, String> {
+        Ok(0)
+    }
+}
+
 pub trait FileRetriever: Sized {
+    fn open_file(&str) -> Result<Self, String> ;
     fn name(&self) -> &str;
+    fn len(&self) -> usize;
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String>;
 }
 

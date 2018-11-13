@@ -31,6 +31,23 @@ impl FileRetriever for TestFile {
     fn name(&self) -> &str {
         &self.name
     }
+    fn open_file(nm : &str) -> Result<Self, String> {
+        Ok(TestFile {
+            name : nm.to_owned(),
+            read_idx :0
+        })
+    }
+    fn len(&self) -> usize {
+        let bts: Vec<u8> = unsafe {
+            TestFileContext::get_context()
+                .files
+                .get(&self.name)
+                .unwrap_or(&Vec::new())
+                .to_vec()
+        };
+        bts.len()
+
+    }
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         let bts: Vec<u8> = unsafe {
             TestFileContext::get_context()
@@ -221,6 +238,7 @@ fn test_read_file() {
 
 #[test]
 fn test_write_file() {
+    //TODO: This
     /*
     let name = vec![b'f', b'l', b'a'];
     let file = vec![b'H', b'e', b'l', b'l', b'o'];
