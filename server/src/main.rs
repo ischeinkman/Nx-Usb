@@ -115,23 +115,17 @@ pub fn server_runner() -> Result<(), String> {
         let finished = {
             let command : &mut CommandStates<StdFileReader, StdFileWriter> = current_command.as_mut().ok_or("Error: current command shouldn't be None.")?;
             if command.needs_input() {
-                dprintln!("Passing block of input to the current command.");
                 let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
                 buffer.resize(usb_interface.block_size(), 0);
                 usb_interface.read_block(&mut buffer)?;
-                dprintln!("Read block.");
                 command.input_block(&buffer)?;
-                dprintln!("Passed input block.");
                 false
             }
             else if command.needs_output() {
-                dprintln!("Retrieving block of output from the current command.");
                 let mut buffer : Vec<u8> = Vec::with_capacity(usb_interface.block_size());
                 buffer.resize(usb_interface.block_size(), 0);
                 command.output_block(&mut buffer)?;
-                dprintln!("Got bytes to output.");
                 usb_interface.write_block(&mut buffer)?;
-                dprintln!("Retrieved output block.");
                 false
             }
             else {

@@ -75,7 +75,6 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
             cur_pushed += 1;
         }
         self.push_idx += cur_pushed;
-        dprintln!("Now pushing block: {:?}", block);
         Ok(cur_pushed)
     }
 
@@ -86,8 +85,6 @@ impl<StoreType: FileContentStorer> ClientCommandState<ReadPrefix> for ReadState<
     fn pull_block(&mut self, buffer: &[u8]) -> Result<usize, String> {
         let block_sz = buffer.len();
         let mut cur_pulled = 0;
-
-        dprintln!("Now processing pulled block {:?}", buffer);
 
         //Extract the file length 
         while self.pull_idx + cur_pulled < 4 && cur_pulled < block_sz {
@@ -156,13 +153,11 @@ impl <FileType : FileRetriever> ClientCommandState<WritePrefix> for WriteState<F
     }
 
     fn push_block(&mut self, block: &mut [u8]) -> Result<usize, String> {
-        dprintln!("Entered write push.");
         let mut cur_pushed = 0; 
         while self.push_idx + cur_pushed < self.prefix.file_name_length as usize && cur_pushed < block.len() {
             block[cur_pushed] = self.switch_name.as_bytes()[self.push_idx + cur_pushed];
             cur_pushed += 1;
         }
-        dprintln!("Finished pushing name; starting file.");
         while self.push_idx + cur_pushed < self.prefix.file_length  as usize && cur_pushed < block.len() {
             let space_left = &mut block[cur_pushed ..];
             cur_pushed += self.file.read_bytes(space_left)?;

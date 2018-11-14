@@ -79,11 +79,9 @@ fn copy_from_switch(
     buffer.resize(client.block_size(), 0);
     loop {
         if command_state.needs_pull() {
-            println!("Trying to pull for a read.");
             client.pull_block(&mut buffer)?;
             command_state.pull_block(&buffer)?;
         } else if command_state.needs_push() {
-            println!("Trying to push for a read.");
             command_state.push_block(&mut buffer)?;
             client.push_block(&buffer)?;
         } else {
@@ -110,11 +108,9 @@ fn copy_to_switch(
     buffer.resize(client.block_size(), 0);
     loop {
         if command_state.needs_pull() {
-            println!("Trying to pull for a write.");
             client.pull_block(&mut buffer)?;
             command_state.pull_block(&buffer)?;
         } else if command_state.needs_push() {
-            println!("Trying to push for a write.");
             command_state.push_block(&mut buffer)?;
             client.push_block(&buffer)?;
         } else {

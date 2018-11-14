@@ -80,7 +80,6 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
         let start_len = self.file_name.len();
         let need_bytes = self.prefix.file_name_length as usize - start_len;
         let block_size = block.len();
-        dprintln!("Now reading block: {:?}", block);
         if need_bytes > block_size {
             let part = String::from_utf8(block.to_vec())
                 .map_err(|e| format!("UTF8 Error: {:?}", e).to_owned())?;
@@ -117,7 +116,6 @@ impl<FileReaderType: FileReader> ServerCommandState<ReadPrefix>
         let fl = if let Some(f) = &mut self.file {
             f
         } else {
-            dprintln!("Could not find file {}.", self.file_name);
             return Ok(0);
         };
         let read_bytes = fl.read_bytes(&mut buffer[buffer_idx_begin..])?;
@@ -149,7 +147,6 @@ pub struct WriteCommandState<FileWriterType: FileWriter> {
 
 impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandState<WriterType> {
     fn from_prefix(prefix: WritePrefix) -> Self {
-        dprintln!("Starting Write for prefix {:?}", prefix);
         let ln = prefix.file_name_length as usize;
         WriteCommandState {
             prefix,
@@ -168,21 +165,17 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
         let name_bytes_to_get = self.prefix.file_name_length as usize - self.file_name.len();
         let file_bytes_to_get = self.prefix.file_length as usize - self.write_idx;
 
-        dprintln!("Starting input process for write.");
         //Already finished: do nothing.
         if self.finished || block_size == 0 {
-            dprintln!("Am flagged as finished; returning.");
             Ok(0)
         }
         //Already finished but don't know it: set the flag.
         else if name_bytes_to_get == 0 && file_bytes_to_get == 0 {
-            dprintln!("Am finished but don't know it; returning.");
             self.finished = true;
             Ok(0)
         }
         //The entire block is for the file name.
         else if name_bytes_to_get > block_size {
-            dprintln!("Using block for file name.");
             let part = String::from_utf8(block.to_vec())
                 .map_err(|e| format!("UTF8 Error: {:?}", e).to_owned())?;
             self.file_name.push_str(&part);
@@ -192,7 +185,6 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
         else if name_bytes_to_get == 0 && file_bytes_to_get > 0 {
             //TODO: This is just a series of borrow checker manipulations to
             // short-circuit set self.file and then use it.
-            dprintln!("Using block for file content.");
             if self.file.is_none() {
                 let fl = WriterType::new(&self.file_name)?;
                 self.file = Some(fl);
@@ -213,7 +205,6 @@ impl<WriterType: FileWriter> ServerCommandState<WritePrefix> for WriteCommandSta
         }
         //Need to both finish the name and start the file
         else {
-            dprintln!("Using block for name and content.");
             let name_bytes = &block[0..name_bytes_to_get];
             let name_part = String::from_utf8(name_bytes.to_vec())
                 .map_err(|e| format!("UTF8 Error: {:?}", e).to_owned())?;

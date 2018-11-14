@@ -93,22 +93,17 @@ impl FileReader for StdFileReader {
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         let buflen = buffer.len();
         if self.finished {
-            dprintln!("Am finished; not reading.");
             Ok(0)
         } else if let Some(fl) = &mut self.file {
-            dprintln!("Reading from file.");
             let rd = fl
                 .read(buffer)
                 .map_err(|e| format!("File read error: {:?}", e).to_owned())?;
             self.idx += rd;
             if rd < buflen {
-                dprintln!("We think we finished reading: wanted to read {} but only read {}", buflen, rd);
                 self.finished = true;
             }
-            dprintln!("Read {} bytes from the file.", rd);
             Ok(rd)
         } else {
-            dprintln!("Reading from directory path.");
             let dirpath = Path::new(&self.path);
             let ents = dirpath
                 .read_dir()
