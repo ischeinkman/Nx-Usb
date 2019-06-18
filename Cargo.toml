@@ -1,12 +1,18 @@
 [package]
-name = "nxusb"
+name = "hello_world"
 version = "0.0.1"
+authors = ["XorTroll"]
 
+[dependencies.nx]
+#git = "https://github.com/rusty-horizon/libnx"
+#branch = "master"
+path = "/workdir/libnx-rs"
+#features = [ "twili" ]
 
+[dependencies.scsi]
+git = "https://github.com/ischeinkman/scsi-rs"
+branch = "master"
 
-[workspace]
-
-members = [
-    "server", 
-    "client"
-]
+[dependencies.fakefat]
+git = "https://github.com/ischeinkman/fakefat"
+branch = "master"
